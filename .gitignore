@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+.env
+.venv/
+*.egg-info/
+dist/
+build/
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Arduino
+*.ino.cpp
+*.ino.dSYM/
+build/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
