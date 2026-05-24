@@ -192,7 +192,7 @@ class MageClient:
         """执行加血"""
         print(f"💚 {target} 触发治愈术，按住 F8 {duration} 秒")
         self.keyboard.hold("f8", duration)
-        time.sleep(0.5)  # 加血后短暂等待
+        time.sleep(1)  # 加血后短暂等待
     
     def _check_and_heal(self):
         """检查是否需要加血（优先级：自己 > 骑士）"""

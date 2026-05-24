@@ -32,7 +32,6 @@ class GameMemory:
         # 2. 连接进程
         try:
             self.pm = pymem.Pymem(self.pid)
-            log.info(f"已连接到进程: {self.pid}")
         except Exception as e:
             log.error(f"连接进程失败: {e}")
             return False
@@ -43,7 +42,6 @@ class GameMemory:
             for module in modules:
                 if module.name == GAME_PROCESS:
                     self.module_base = module.lpBaseOfDll
-                    log.info(f"模块基址: 0x{self.module_base:X}")
                     break
             
             if not self.module_base:
@@ -57,7 +55,6 @@ class GameMemory:
         # 将十六进制字符串转换为整数
         base_offset_int = int(BASE_OFFSET, 16)
         self.struct_base = self.module_base + base_offset_int
-        log.info(f"结构体基址(坐标X): 0x{self.struct_base:X}")
         
         return True
     

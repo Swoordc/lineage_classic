@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.utils.window import find_game_window
 from src.core.memory import GameMemory
-from src.config import MAGE_IP, MAGE_PORT, SEND_INTERVAL
+from src.config import MAGE_IP, MAGE_PORT, SEND_INTERVAL, KNIGHT_HEAL_THRESHOLD
 
 
 def main():
@@ -46,10 +46,11 @@ def main():
             hp = game.get_hp()
             
             if hp is not None and hp > 0:
-                # 发送血量
-                data = str(hp).encode('utf-8')
-                sock.sendto(data, (MAGE_IP, MAGE_PORT))
-                print("📤 发送血量: {}".format(hp))
+                if KNIGHT_HEAL_THRESHOLD > hp:
+                    # 发送血量
+                    data = str(hp).encode('utf-8')
+                    sock.sendto(data, (MAGE_IP, MAGE_PORT))
+                    print("📤 发送血量: {}".format(hp))
             else:
                 print("⚠️ 读取血量失败")
             
