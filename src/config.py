@@ -13,13 +13,22 @@ WINDOW_CLASS = "GLFW30"
 HEAL_KEY = "f8"
 
 # ========== 血量阈值 ==========
-MAGE_HEAL_THRESHOLD = 150      # 单端法师：自己的血量
-KNIGHT_HEAL_THRESHOLD = 250    # 双端法师：骑士的血量
+MAGE_HEAL_THRESHOLD = 150       # 法师治愈触发阈值（单端/双端共用）
+KNIGHT_HEAL_THRESHOLD = 150    # 骑士治愈触发阈值（双端）
+
+# ========== 治愈时长 ==========
+MAGE_HEAL_DURATION = 1         # 单端法师治愈按住秒数
+MAGE_SELF_HEAL_DURATION = 1.5  # 双端法师自保按住秒数
+KNIGHT_HEAL_DURATION = 1       # 双端骑士治愈按住秒数
 
 # ========== 骑士端（发送端）配置 ==========
 # 法师电脑的 IP 和端口
 MAGE_IP = "192.168.1.7"      # 改成法师电脑的实际 IP
 MAGE_PORT = 18888             # 通信端口
+SEND_INTERVAL = 0.3            # 每秒发送次数
 
-# 发送频率（秒）
-SEND_INTERVAL = 0.3          # 每秒约发送 3 次
+# ========== 法师端（接收端）配置 ==========
+MAGE_BIND_PORT = 18888        # UDP 接收端口
+
+# 跟随配置
+FOLLOW_CLICK_INTERVAL = 0.1              # 跟随点击间隔（秒）

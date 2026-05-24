@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.utils.window import find_game_window
 from src.core.memory import GameMemory
-from src.config import MAGE_HEAL_THRESHOLD, HEAL_KEY
+from src.config import MAGE_HEAL_THRESHOLD, MAGE_HEAL_DURATION, HEAL_KEY
 from src.arduino_keyboard import ArduinoKeyboard
 
 
@@ -17,7 +17,7 @@ def main():
     print("=" * 50)
     print("单端法师自动治愈脚本")
     print(f"触发条件: 血量 < {MAGE_HEAL_THRESHOLD}")
-    print(f"触发按键: {HEAL_KEY.upper()}")
+    print(f"触发按键: {HEAL_KEY.upper()} (按住 {MAGE_HEAL_DURATION} 秒)")
     print("=" * 50)
     
     # 1. 查找游戏窗口
@@ -62,8 +62,7 @@ def main():
                     if current_time - last_heal_time >= heal_cooldown:
                         print(f"⚠️ 血量过低 ({hp})，触发治愈术")
                         
-                        # 按住 F8 1秒（治愈术需要长按）
-                        keyboard.hold(HEAL_KEY, 1)
+                        keyboard.hold(HEAL_KEY, MAGE_HEAL_DURATION)
                         
                         last_heal_time = current_time
 
