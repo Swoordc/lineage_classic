@@ -25,20 +25,6 @@ def main():
     
     print("\n测试按键...")
     
-    # 2. 测试 F8 点击
-    print("\n测试 F8 点击（请观察游戏或记事本）")
-    input("按 Enter 键开始...")
-    # 切换到游戏窗口
-    time.sleep(3)
-    kb.click("f8")
-    
-    # 3. 测试 F1 点击
-    print("\n测试 F1 点击")
-    input("按 Enter 键开始...")
-    # 切换到游戏窗口
-    time.sleep(3)
-    kb.click("f1")
-    
     # 4. 测试长按
     print("\n测试 F8 长按 1 秒")
     input("按 Enter 键开始...")
@@ -46,6 +32,11 @@ def main():
     time.sleep(3)
     kb.hold("f8", 1.5)
     
+    time.sleep(3)
+    kb.press_mouse()
+    time.sleep(0.1)
+    kb.release_mouse()
+
     kb.close()
     print("\n测试完成！")
 

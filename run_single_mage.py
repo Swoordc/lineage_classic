@@ -65,7 +65,7 @@ def main():
                         keyboard.hold(HEAL_KEY, MAGE_HEAL_DURATION)
                         
                         last_heal_time = current_time
-
+            time.sleep(0.1)
     except KeyboardInterrupt:
         print("\n\n用户中断，脚本停止")
     finally:

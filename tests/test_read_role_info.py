@@ -37,6 +37,9 @@ def main():
     print(f"魔量: {info['mp']} / {info['max_mp']}")
     print(f"等级: {info['level']}")
     print("=" * 50)
+    while True:
+        info = game.get_hp()
+        print(f"血量：{info}")
     
     game.close()
 
