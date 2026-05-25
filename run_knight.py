@@ -46,11 +46,13 @@ def main():
             hp = game.get_hp()
             
             if hp is not None and hp > 0:
-                if KNIGHT_HEAL_THRESHOLD > hp:
-                    # 发送血量
-                    data = str(hp).encode('utf-8')
-                    sock.sendto(data, (MAGE_IP, MAGE_PORT))
-                    print("📤 发送血量: {}".format(hp))
+                
+                # 发送血量
+                data = str(hp).encode('utf-8')
+                sock.sendto(data, (MAGE_IP, MAGE_PORT))
+                print("📤 发送血量: {}".format(hp))
+            elif hp == 0:
+                print("角色死亡")
             else:
                 print("⚠️ 读取血量失败")
             

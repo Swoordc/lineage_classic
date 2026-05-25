@@ -1,48 +1,31 @@
-"""测试读取角色信息"""
-
 import sys
 import os
-
+import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.utils.window import find_game_window
 from src.core.memory import GameMemory
-
+from src.utils.window import find_game_window
 
 def main():
-    # 1. 找窗口
     hwnd = find_game_window()
     if not hwnd:
         print("未找到游戏窗口")
         return
-    
-    print(f"找到窗口句柄: {hwnd}")
-    
-    # 2. 连接游戏内存
     game = GameMemory(hwnd)
     if not game.connect():
-        print("连接游戏失败")
+        print("连接失败")
         return
-    
-    # 3. 读取所有信息
-    info = game.get_all_info()
-    
-    # 4. 打印结果
-    print("\n" + "=" * 50)
-    print("角色信息")
-    print("=" * 50)
-    print(f"坐标X: {info['x']:.2f}")
-    print(f"坐标Y: {info['y']:.2f}")
-    print(f"血量: {info['hp']} / {info['max_hp']}")
-    print(f"魔量: {info['mp']} / {info['max_mp']}")
-    print(f"等级: {info['level']}")
-    print("=" * 50)
-    while True:
-        info = game.get_hp()
-        print(f"血量：{info}")
-    
-    game.close()
 
+    print("开始循环读取血量，每 0.5 秒一次，共 100 次...")
+    for i in range(100):
+        hp = game.get_hp()
+        if hp is not None:
+            print(f"{i}: HP = {hp}")
+        else:
+            print(f"{i}: 读取失败")
+            break
+        time.sleep(0.05)
+    game.close()
 
 if __name__ == "__main__":
     main()
