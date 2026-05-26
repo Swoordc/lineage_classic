@@ -25,16 +25,33 @@ from src.core.memory import GameMemory
 from src.config import (
     MAGE_BIND_PORT,
     KNIGHT_HEAL_THRESHOLD,
-    MAGE_HEAL_THRESHOLD,       # 自保治愈阈值
-    MAGE_HOME_THRESHOLD,       # 回家阈值（需要你添加）
-    MAGE_POTION_THRESHOLD,     # 喝红水阈值（需要你添加）
-    HEAL_COOLDOWN,             # 治愈冷却时间（秒）
-    POTION_COOLDOWN,           # 红水冷却时间（秒，可选）
-    HEAL_KEY,                  # "f8"
-    HOME_KEY,                  # "f12"
-    POTION_KEY,                # "f11"
-    KNIGHT_HEAL_DURATION,      # 骑士加血按F8的时长（秒）
+    MAGE_HEAL_THRESHOLD,
+    MAGE_HOME_THRESHOLD,
+    MAGE_POTION_THRESHOLD,
+    HEAL_COOLDOWN,
+    POTION_COOLDOWN,
+    HEAL_KEY,
+    HOME_KEY,
+    POTION_KEY,
+    KNIGHT_HEAL_DURATION,
+    # 加Buff配置
+    BUFF_ENABLED,
+    BUFF_KEYS,
+    BUFF_HOLD_DURATION,
+    BUFF_KEY_INTERVAL,
+    BUFF_CYCLE_INTERVAL,
 )
+
+# ---------- 周期性加Buff功能 ----------
+def periodic_keys(keyboard, keys, hold_duration, key_interval, cycle_interval):
+    """
+    周期性依次按下指定的按键列表
+    """
+    while True:
+        time.sleep(cycle_interval)
+        for key in keys:
+            keyboard.hold(key, hold_duration)
+            time.sleep(key_interval)
 
 # ---------- 鼠标锁定 (ClipCursor) ----------
 user32 = ctypes.windll.user32
@@ -54,12 +71,12 @@ def unlock_mouse():
 
 class MageClient:
     def __init__(self):
-        self.running = False          # 主循环运行标志（热键控制启动/停止）
-        self.alive = True             # 脚本是否存活（用于退出）
-        self.f8_pressed = False       # 是否正按住F8（自保中）
-        self.heal_cooldown_end = 0    # 治愈冷却结束时间（时间戳）
-        self.potion_cooldown_end = 0  # 红水冷却结束时间
-        self.knight_hp = 1000         # 骑士血量（UDP更新）
+        self.running = False
+        self.alive = True
+        self.f8_pressed = False
+        self.heal_cooldown_end = 0
+        self.potion_cooldown_end = 0
+        self.knight_hp = 1000
         self.click_x = 0
         self.click_y = 0
         self.sock = None
@@ -79,6 +96,10 @@ class MageClient:
         print(f"自保治愈阈值: {MAGE_HEAL_THRESHOLD} (按住{HEAL_KEY.upper()}直到达标)")
         print(f"骑士加血阈值: {KNIGHT_HEAL_THRESHOLD} (点按{HEAL_KEY.upper()}{KNIGHT_HEAL_DURATION}秒)")
         print(f"治愈冷却: {HEAL_COOLDOWN}秒")
+        if BUFF_ENABLED:
+            print(f"自动加Buff: 每{BUFF_CYCLE_INTERVAL//60}分钟依次 {BUFF_KEYS} (按住{BUFF_HOLD_DURATION}秒, 间隔{BUFF_KEY_INTERVAL}秒)")
+        else:
+            print("自动加Buff: 禁用")
         print("=" * 50)
 
         # 1. 创建UDP套接字
@@ -109,6 +130,16 @@ class MageClient:
         self.udp_thread.start()
         print("✓ UDP接收线程已启动")
 
+        # 5. 如果配置启用，启动周期性加Buff线程
+        if BUFF_ENABLED:
+            self.key_thread = threading.Thread(
+                target=periodic_keys,
+                args=(self.keyboard, BUFF_KEYS, BUFF_HOLD_DURATION, BUFF_KEY_INTERVAL, BUFF_CYCLE_INTERVAL),
+                daemon=True
+            )
+            self.key_thread.start()
+            print(f"✓ 自动加Buff线程已启动")
+
         print("✓ 初始化完成")
         return True
 
@@ -117,7 +148,6 @@ class MageClient:
         if self.running:
             return
         self.running = True
-        # 获取当前鼠标位置（骑士身上）并锁定
         self.click_x, self.click_y = pyautogui.position()
         print(f"🚀 脚本启动，记录鼠标位置 ({self.click_x}, {self.click_y})，锁定跟随")
         lock_mouse(self.click_x, self.click_y)
@@ -126,7 +156,6 @@ class MageClient:
         if not self.running:
             return
         self.running = False
-        # 如果正按住F8，先释放
         if self.f8_pressed:
             self.keyboard.release(HEAL_KEY)
             self.f8_pressed = False
@@ -141,7 +170,6 @@ class MageClient:
                 hp = int(data.decode('utf-8'))
                 with self.hp_lock:
                     self.knight_hp = hp
-                print(f"📥 骑士血量: {hp}")
             except socket.timeout:
                 continue
             except Exception as e:
@@ -159,7 +187,6 @@ class MageClient:
 
         try:
             while self.alive:
-                # 只有 running 为 True 时执行核心逻辑
                 if self.running:
                     now = time.time()
                     hp = self.game.get_hp()
@@ -169,7 +196,6 @@ class MageClient:
 
                     # ----- 1. 回家（最高优先级）-----
                     if hp < MAGE_HOME_THRESHOLD:
-                        # 先释放可能按住的F8
                         if self.f8_pressed:
                             self.keyboard.release(HEAL_KEY)
                             self.f8_pressed = False
@@ -177,7 +203,7 @@ class MageClient:
                         self.keyboard.hold(HOME_KEY, 2.0)
                         print("脚本已停止（回家）")
                         self.running = False
-                        self.alive = False   # 退出整个脚本
+                        self.alive = False
                         break
 
                     # ----- 2. 喝红水 -----
@@ -185,9 +211,7 @@ class MageClient:
                         self.keyboard.click(POTION_KEY)
                         self.potion_cooldown_end = now + POTION_COOLDOWN
                         print(f"🍷 喝红水 (hp={hp})")
-                        # 喝完后短暂等待，让药水生效
-                        time.sleep(0.2)
-                        continue  # 跳过后续治愈判断，下一轮再读血量
+                        continue
 
                     # ----- 3. 自保治愈（按住F8直到血量达标）-----
                     if hp < MAGE_HEAL_THRESHOLD and now >= self.heal_cooldown_end:
@@ -195,14 +219,11 @@ class MageClient:
                             print(f"💚 自保治愈开始，按住{HEAL_KEY.upper()} (hp={hp})")
                             self.keyboard.press(HEAL_KEY)
                             self.f8_pressed = True
-                            # 记录冷却（按下即开始冷却）
                             self.heal_cooldown_end = now + HEAL_COOLDOWN
-                    else:
-                        # 血量达标 或 冷却未过，释放F8
-                        if self.f8_pressed:
-                            print(f"✅ 自保治愈结束，释放{HEAL_KEY.upper()}")
-                            self.keyboard.release(HEAL_KEY)
-                            self.f8_pressed = False
+                    elif self.f8_pressed and hp >= MAGE_HEAL_THRESHOLD:
+                        print(f"✅ 自保治愈结束，释放{HEAL_KEY.upper()}")
+                        self.keyboard.release(HEAL_KEY)
+                        self.f8_pressed = False
 
                     # ----- 4. 骑士加血（仅在未按住F8且冷却未过时）-----
                     if (not self.f8_pressed) and now >= self.heal_cooldown_end:
@@ -210,10 +231,10 @@ class MageClient:
                             knight_hp = self.knight_hp
                         if knight_hp < KNIGHT_HEAL_THRESHOLD:
                             print(f"💙 骑士加血，点按{HEAL_KEY.upper()} {KNIGHT_HEAL_DURATION}秒")
-                            self.keyboard.click(HEAL_KEY, duration=KNIGHT_HEAL_DURATION)
+                            self.keyboard.hold(HEAL_KEY, KNIGHT_HEAL_DURATION)
                             self.heal_cooldown_end = now + HEAL_COOLDOWN
 
-                time.sleep(0.05)   # 20Hz 循环
+                time.sleep(0.05)
 
         except KeyboardInterrupt:
             print("\n用户中断")
