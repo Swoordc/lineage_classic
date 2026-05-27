@@ -6,7 +6,7 @@ ARDUINO_BAUDRATE = 9600
 
 # ========== 游戏配置 ==========
 GAME_PROCESS = "LC.exe"
-BASE_OFFSET = "149B350"
+BASE_OFFSET = "149B210"
 WINDOW_CLASS = "GLFW30"
 
 # ========== 按键配置 ==========
@@ -46,7 +46,7 @@ POTION_KEY = "f11"                # 喝水快捷键
 # KNIGHT_HEAL_DURATION 你已有（之前是0.5）
 
 # ========== 临时Buff功能配置 ==========
-BUFF_ENABLED = True                 # 是否启用自动加Buff功能
+BUFF_ENABLED = False                 # 是否启用自动加Buff功能
 BUFF_KEYS = ["f5", "f6", "f7", "f9"]  # 依次按下的按键列表
 BUFF_HOLD_DURATION = 0.5            # 每个按键按住时长（秒）
 BUFF_KEY_INTERVAL = 2.0             # 按键之间的间隔（秒）

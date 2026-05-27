@@ -39,7 +39,6 @@ from src.config import (
     BUFF_KEYS,
     BUFF_HOLD_DURATION,
     BUFF_KEY_INTERVAL,
-    BUFF_CYCLE_INTERVAL,
 )
 
 # ---------- 周期性加Buff功能 ----------
@@ -50,7 +49,7 @@ def periodic_keys(keyboard, keys, hold_duration, key_interval, cycle_interval):
     while True:
         time.sleep(cycle_interval)
         for key in keys:
-            keyboard.hold(key, hold_duration)
+            keyboard.hold(key, hold_duration)   
             time.sleep(key_interval)
 
 # ---------- 鼠标锁定 (ClipCursor) ----------
@@ -97,7 +96,7 @@ class MageClient:
         print(f"骑士加血阈值: {KNIGHT_HEAL_THRESHOLD} (点按{HEAL_KEY.upper()}{KNIGHT_HEAL_DURATION}秒)")
         print(f"治愈冷却: {HEAL_COOLDOWN}秒")
         if BUFF_ENABLED:
-            print(f"自动加Buff: 每{BUFF_CYCLE_INTERVAL//60}分钟依次 {BUFF_KEYS} (按住{BUFF_HOLD_DURATION}秒, 间隔{BUFF_KEY_INTERVAL}秒)")
+            print(f"自动加Buff: 每{1200//60}分钟依次 {BUFF_KEYS} (按住{BUFF_HOLD_DURATION}秒, 间隔{BUFF_KEY_INTERVAL}秒)")
         else:
             print("自动加Buff: 禁用")
         print("=" * 50)
@@ -134,7 +133,7 @@ class MageClient:
         if BUFF_ENABLED:
             self.key_thread = threading.Thread(
                 target=periodic_keys,
-                args=(self.keyboard, BUFF_KEYS, BUFF_HOLD_DURATION, BUFF_KEY_INTERVAL, BUFF_CYCLE_INTERVAL),
+                args=(self.keyboard, BUFF_KEYS, BUFF_HOLD_DURATION, BUFF_KEY_INTERVAL, 1200),
                 daemon=True
             )
             self.key_thread.start()
