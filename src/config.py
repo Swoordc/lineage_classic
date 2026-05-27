@@ -1,7 +1,41 @@
 """配置文件"""
 
+from dataclasses import dataclass
+from typing import Literal
+
+
+# ========== Action 定义 ==========
+@dataclass(frozen=True)
+class Action:
+    """技能/道具动作。同一个热键可以有多个 Action（如 F8 自保 vs F8 救打手）"""
+    key: str          # 热键名 "f1"~"f12"
+    hold: float       # 按住秒数
+    cooldown: float   # 冷却时间（秒）
+    threshold: int    # 触发阈值（血量低于此值触发）
+    priority: int     # 越小越优先（0=回家, 1=红水, 2=自保, 3=救打手）
+
+
+# --- 单端法师动作 ---
+SINGLE_MAGE_ACTIONS = [
+    Action("f8", hold=0.5, cooldown=2.0, threshold=130, priority=0),
+]
+
+# --- 双端法师动作 ---
+HOME   = Action("f12", hold=2.0, cooldown=0,   threshold=50,  priority=0)
+DRINK  = Action("f11", hold=0.1, cooldown=0.5, threshold=100, priority=1)
+SELF_HEAL  = Action("f8", hold=1.5, cooldown=2.0, threshold=130, priority=2)
+HEAL_OTHER = Action("f8", hold=0.5, cooldown=2.0, threshold=235, priority=3)
+
+DUAL_MAGE_ACTIONS = [HOME, DRINK, SELF_HEAL, HEAL_OTHER]
+
+# --- Buff 动作（双端法师周期性执行） ---
+BUFF_ENABLED = True
+BUFF_KEYS = ["f5", "f6", "f7", "f9"]
+BUFF_HOLD_DURATION = 0.5
+BUFF_KEY_INTERVAL = 2.0
+
 # ========== Arduino 配置 ==========
-ARDUINO_PORT = "COM3"        # 改成你的 Arduino 端口
+ARDUINO_PORT = "COM3"
 ARDUINO_BAUDRATE = 9600
 
 # ========== 游戏配置 ==========
@@ -9,44 +43,40 @@ GAME_PROCESS = "LC.exe"
 BASE_OFFSET = "149B210"
 WINDOW_CLASS = "GLFW30"
 
-# ========== 按键配置 ==========
-HEAL_KEY = "f8"
+# ========== 打手端（UDP 发送端）配置 ==========
+ATTACKER_IP = "192.168.1.7"
+ATTACKER_PORT = 18888
+SEND_INTERVAL = 0.5
 
-# ========== 血量阈值 ==========
-MAGE_HEAL_THRESHOLD = 130       # 法师治愈触发阈值（单端/双端共用）
-KNIGHT_HEAL_THRESHOLD = 235    # 骑士治愈触发阈值（双端）
+# ========== 法师端（UDP 接收端）配置 ==========
+MAGE_BIND_PORT = 18888
 
-# ========== 治愈时长 ==========
-MAGE_HEAL_DURATION = 0.5       # 单端法师治愈按住秒数
-MAGE_SELF_HEAL_DURATION = 1.5  # 双端法师自保按住秒数
-KNIGHT_HEAL_DURATION = 0.5     # 双端骑士治愈按住秒数
-HEAL_KEY = "f8"                # 加血快捷键
-
-# ========== 骑士端（发送端）配置 ==========
-# 法师电脑的 IP 和端口
-MAGE_IP = "192.168.1.7"      # 改成法师电脑的实际 IP
-MAGE_PORT = 18888             # 通信端口
-SEND_INTERVAL = 0.5            # 发送间隔时间(秒)
-
-# ========== 法师端（接收端）配置 ==========
-MAGE_BIND_PORT = 18888        # UDP 接收端口
+# ========== 攻击者加血阈值（双端：打手的血量低于此值法师会治他） ==========
+ATTACKER_HEAL_THRESHOLD = 235
 
 # ========== 跟随点击配置 ==========
-FOLLOW_CLICK_INTERVAL = 0.3       # 点击间隔（秒）
-CLICK_HOLD_DURATION = 0.2         # 每次点击的按住时长（秒）
+FOLLOW_CLICK_INTERVAL = 0.3
+CLICK_HOLD_DURATION = 0.2
 
-# ========== 双端法师（自保与回家）配置 ==========
-MAGE_HOME_THRESHOLD = 50          # 低于此值按F12回家
-MAGE_POTION_THRESHOLD = 100       # 低于此值喝红水（F11）
-HEAL_COOLDOWN = 2.0               # 治愈冷却时间（秒），自保和骑士共用
-POTION_COOLDOWN = 0.5             # 红水冷却（秒），避免连续狂按，设为0则无冷却
-HOME_KEY = "f12"                  # 回家快捷键
-POTION_KEY = "f11"                # 喝水快捷键
-# HEAL_KEY 你已经定义为 "f8"
-# KNIGHT_HEAL_DURATION 你已有（之前是0.5）
+# ========== 日志 ==========
+LogLevel = Literal["DEBUG", "INFO", "WARN", "ERROR"]
+LOG_LEVEL: LogLevel = "INFO"
 
-# ========== 临时Buff功能配置 ==========
-BUFF_ENABLED = False                 # 是否启用自动加Buff功能
-BUFF_KEYS = ["f5", "f6", "f7", "f9"]  # 依次按下的按键列表
-BUFF_HOLD_DURATION = 0.5            # 每个按键按住时长（秒）
-BUFF_KEY_INTERVAL = 2.0             # 按键之间的间隔（秒）
+
+def validate_config() -> None:
+    """启动时校验配置合法性"""
+    errors: list[str] = []
+
+    # 检查阈值范围
+    for name, action in [("SELF_HEAL", SELF_HEAL), ("HEAL_OTHER", HEAL_OTHER)]:
+        if not (50 <= action.threshold <= 500):
+            errors.append(f"{name}.threshold={action.threshold} 超出合理范围 50-500")
+
+    # 检查必需端口
+    if not (1024 <= ATTACKER_PORT <= 65535):
+        errors.append(f"ATTACKER_PORT={ATTACKER_PORT} 无效")
+    if not (1024 <= MAGE_BIND_PORT <= 65535):
+        errors.append(f"MAGE_BIND_PORT={MAGE_BIND_PORT} 无效")
+
+    if errors:
+        raise ValueError("配置校验失败:\n  " + "\n  ".join(errors))

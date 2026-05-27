@@ -1,10 +1,8 @@
-import sys
-import os
+"""测试游戏内存读取"""
 import time
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from src.core.memory import GameMemory
+from src.game.memory import GameMemory
 from src.utils.window import find_game_window
+
 
 def main():
     hwnd = find_game_window()
@@ -15,8 +13,7 @@ def main():
     if not game.connect():
         print("连接失败")
         return
-
-    print("开始循环读取血量，每 0.5 秒一次，共 100 次...")
+    print("开始循环读取血量，每 0.05 秒一次，共 100 次...")
     for i in range(100):
         hp = game.get_hp()
         if hp is not None:
@@ -26,6 +23,7 @@ def main():
             break
         time.sleep(0.05)
     game.close()
+
 
 if __name__ == "__main__":
     main()
