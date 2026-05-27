@@ -21,7 +21,9 @@ class BaseRole(ABC):
         self.running = False
         self._log = get_logger()
 
-    # ========== 子类实现 ==========
+    # ========== 子类可覆盖 ==========
+
+    _needs_keyboard: bool = True  # 是否需要 Arduino 键盘
 
     @abstractmethod
     def _setup_extra(self) -> bool:
@@ -62,10 +64,11 @@ class BaseRole(ABC):
             self._log.error("内存连接失败")
             return False
 
-        self.keyboard = ArduinoKeyboard()
-        if not self.keyboard.connect():
-            self._log.error("Arduino 连接失败")
-            return False
+        if self._needs_keyboard:
+            self.keyboard = ArduinoKeyboard()
+            if not self.keyboard.connect():
+                self._log.error("Arduino 连接失败")
+                return False
 
         if not self._setup_extra():
             return False

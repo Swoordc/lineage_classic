@@ -8,6 +8,8 @@ from src.roles.base import BaseRole
 
 
 class AttackerRole(BaseRole):
+    _needs_keyboard: bool = False
+
     def __init__(self) -> None:
         super().__init__()
         self._sock: socket.socket | None = None
