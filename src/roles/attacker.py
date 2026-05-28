@@ -3,7 +3,7 @@
 import socket
 import time
 
-from src.config import ATTACKER_IP, ATTACKER_PORT, SEND_INTERVAL
+from src.config import ATTACKER_IP, UDP_PORT, SEND_INTERVAL
 from src.roles.base import BaseRole
 
 
@@ -15,20 +15,26 @@ class AttackerRole(BaseRole):
         self._sock: socket.socket | None = None
         self._send_count: int = 0
         self._last_summary: float = 0
+        self._last_send: float = 0
 
     def _setup_extra(self) -> bool:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._log.info(f"UDP 发送目标: {ATTACKER_IP}:{ATTACKER_PORT}")
+        self._log.info(f"UDP 发送目标: {ATTACKER_IP}:{UDP_PORT}")
         return True
 
     def _tick(self) -> None:
+        now = time.time()
+        if now - self._last_send < SEND_INTERVAL:
+            return
+
         hp = self.game.get_hp()  # type: ignore[union-attr]
         if hp is None or hp <= 0:
             return
 
         data = str(hp).encode('utf-8')
-        self._sock.sendto(data, (ATTACKER_IP, ATTACKER_PORT))  # type: ignore[union-attr]
+        self._sock.sendto(data, (ATTACKER_IP, UDP_PORT))  # type: ignore[union-attr]
         self._send_count += 1
+        self._last_send = now
 
         # 心跳摘要（每 30 秒）
         now = time.time()

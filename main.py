@@ -66,20 +66,17 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # 日志级别：首次导入时已创建 INFO 级别，这里按需覆盖
     if args.verbose:
         set_log_level("DEBUG")
     else:
         set_log_level(LOG_LEVEL)
 
-    # 配置校验
     try:
         validate_config()
     except ValueError as e:
         print(f"配置错误: {e}")
         sys.exit(1)
 
-    # 选择角色
     role_key = args.role if args.role else show_menu()
     name = ROLES[role_key][0]
     print(f"\n启动 {name}...\n")

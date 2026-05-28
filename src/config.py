@@ -1,4 +1,4 @@
-"""配置文件"""
+"""游戏辅助工具配置：Action 定义、硬件参数、网络设置、日志级别"""
 
 from dataclasses import dataclass
 from typing import Literal
@@ -21,17 +21,17 @@ SINGLE_MAGE_ACTIONS = [
 ]
 
 # --- 双端法师动作 ---
-HOME   = Action("f12", hold=2.0, cooldown=0,   threshold=50,  priority=0)
+HOME   = Action("f12", hold=1.0, cooldown=0,   threshold=50,  priority=0)
 DRINK  = Action("f11", hold=0.1, cooldown=0.5, threshold=100, priority=1)
-SELF_HEAL  = Action("f8", hold=1.5, cooldown=2.0, threshold=130, priority=2)
-HEAL_OTHER = Action("f8", hold=0.5, cooldown=2.0, threshold=235, priority=3)
+SELF_HEAL  = Action("f8", hold=1.2, cooldown=0.5, threshold=130, priority=2)
+HEAL_OTHER = Action("f8", hold=0.7, cooldown=0.5, threshold=235, priority=3)
 
 DUAL_MAGE_ACTIONS = [HOME, DRINK, SELF_HEAL, HEAL_OTHER]
 
 # --- Buff 动作（双端法师周期性执行） ---
-BUFF_ENABLED = True
-BUFF_KEYS = ["f5", "f6", "f7", "f9"]
-BUFF_HOLD_DURATION = 0.5
+BUFF_ENABLED = False
+BUFF_KEYS = ["f5", "f6", "f7", "f9", "f10"]
+BUFF_HOLD_DURATION = 0.6
 BUFF_KEY_INTERVAL = 2.0
 
 # ========== Arduino 配置 ==========
@@ -43,20 +43,13 @@ GAME_PROCESS = "LC.exe"
 BASE_OFFSET = "149B210"
 WINDOW_CLASS = "GLFW30"
 
-# ========== 打手端（UDP 发送端）配置 ==========
-ATTACKER_IP = "192.168.1.7"
-ATTACKER_PORT = 18888
-SEND_INTERVAL = 0.5
+# ========== UDP 通信配置 ==========
+UDP_PORT = 18888               # 发送端和接收端共用
+ATTACKER_IP = "192.168.1.7"    # 法师电脑的 IP（打手发送目标）
+SEND_INTERVAL = 0.2             # 打手发送间隔（秒）
 
-# ========== 法师端（UDP 接收端）配置 ==========
-MAGE_BIND_PORT = 18888
-
-# ========== 攻击者加血阈值（双端：打手的血量低于此值法师会治他） ==========
+# ========== 攻击者加血阈值 ==========
 ATTACKER_HEAL_THRESHOLD = 235
-
-# ========== 跟随点击配置 ==========
-FOLLOW_CLICK_INTERVAL = 0.3
-CLICK_HOLD_DURATION = 0.2
 
 # ========== 日志 ==========
 LogLevel = Literal["DEBUG", "INFO", "WARN", "ERROR"]
@@ -72,11 +65,8 @@ def validate_config() -> None:
         if not (50 <= action.threshold <= 500):
             errors.append(f"{name}.threshold={action.threshold} 超出合理范围 50-500")
 
-    # 检查必需端口
-    if not (1024 <= ATTACKER_PORT <= 65535):
-        errors.append(f"ATTACKER_PORT={ATTACKER_PORT} 无效")
-    if not (1024 <= MAGE_BIND_PORT <= 65535):
-        errors.append(f"MAGE_BIND_PORT={MAGE_BIND_PORT} 无效")
+    if not (1024 <= UDP_PORT <= 65535):
+        errors.append(f"UDP_PORT={UDP_PORT} 无效")
 
     if errors:
         raise ValueError("配置校验失败:\n  " + "\n  ".join(errors))

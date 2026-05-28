@@ -88,7 +88,6 @@ class GameMemory:
         """进程是否存活（连续错误过多认为已关闭）"""
         return self._error_count < MAX_READ_ERRORS
 
-    # ---- 便捷读取 ----
 
     def get_hp(self) -> int | None:
         if self.struct_base is None:

@@ -13,7 +13,6 @@ class SingleMageRole(BaseRole):
         self._last_heal_time: float = 0
 
     def _setup_extra(self) -> bool:
-        # 调整窗口
         hwnd = self.game.hwnd  # type: ignore[union-attr]
         set_window_size_and_position(hwnd, 1280, 960, 0, 0)
         self._log.info("单端法师初始化完成")

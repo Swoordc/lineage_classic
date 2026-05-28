@@ -19,7 +19,7 @@ from src.config import (
     DRINK,
     SELF_HEAL,
     HEAL_OTHER,
-    MAGE_BIND_PORT,
+    UDP_PORT,
 )
 from src.roles.base import BaseRole
 
@@ -85,9 +85,9 @@ class DualMageRole(BaseRole):
 
     def _setup_extra(self) -> bool:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._sock.bind(('0.0.0.0', MAGE_BIND_PORT))
+        self._sock.bind(('0.0.0.0', UDP_PORT))
         self._sock.settimeout(0.5)
-        self._log.info(f"UDP 端口已绑定: {MAGE_BIND_PORT}")
+        self._log.info(f"UDP 端口已绑定: {UDP_PORT}")
 
         self._udp_running = True
         self._udp_thread = threading.Thread(target=self._udp_receiver, daemon=True)
@@ -137,7 +137,6 @@ class DualMageRole(BaseRole):
 
             self._execute(action, hp, now)
 
-            # 回家后停止
             if action is HOME:
                 self.running = False
             return  # 每轮只触发一个
@@ -166,7 +165,6 @@ class DualMageRole(BaseRole):
         if current >= threshold:
             return False
 
-        # 冷却检查
         if action is DRINK:
             if now < self._potion_cooldown_end:
                 return False
