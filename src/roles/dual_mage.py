@@ -9,7 +9,6 @@ import time
 import pyautogui
 
 from src.config import (
-    ATTACKER_HEAL_THRESHOLD,
     BUFF_ENABLED,
     BUFF_HOLD_DURATION,
     BUFF_KEY_INTERVAL,
@@ -34,12 +33,10 @@ class DualMageRole(BaseRole):
         self._buff_thread: threading.Thread | None = None
         self._udp_running: bool = False
         self._attacker_hp: int = 1000
-        self._hp_lock = threading.Lock()
         self._click_x: int = 0
         self._click_y: int = 0
-        self._f8_pressed: bool = False
-        self._heal_cooldown_end: float = 0
-        self._potion_cooldown_end: float = 0
+        self._heal_cd_end: float = 0
+        self._potion_cd_end: float = 0
         self._last_summary: float = 0
         self._heal_count: int = 0
         self._potion_count: int = 0
@@ -64,9 +61,7 @@ class DualMageRole(BaseRole):
         while self._udp_running:
             try:
                 data, _ = self._sock.recvfrom(1024)  # type: ignore[union-attr]
-                hp = int(data.decode('utf-8'))
-                with self._hp_lock:
-                    self._attacker_hp = hp
+                self._attacker_hp = int(data.decode('utf-8'))
             except socket.timeout:
                 continue
             except Exception:
@@ -109,9 +104,6 @@ class DualMageRole(BaseRole):
         self._potion_count = 0
 
     def _on_stop(self) -> None:
-        if self._f8_pressed:
-            self.keyboard.release("f8")  # type: ignore[union-attr]
-            self._f8_pressed = False
         self._unlock_mouse()
 
     # ========== 主循环 ==========
@@ -124,13 +116,7 @@ class DualMageRole(BaseRole):
 
         self._log.debug(f"HP={hp}, 打手HP={self._attacker_hp}")
 
-        # 自保治愈中：检查是否血量已恢复
-        if self._f8_pressed and hp >= SELF_HEAL.threshold:
-            self.keyboard.release("f8")  # type: ignore[union-attr]
-            self._f8_pressed = False
-            self._log.warn(f"自保治愈结束 (HP={hp})")
-
-        # 按优先级遍历 Action：回家 > 红水 > 自保 > 救打手
+        # 按优先级：回家 > 红水 > 自保 > 救打手
         for action in DUAL_MAGE_ACTIONS:
             if not self._should_trigger(action, hp, now):
                 continue
@@ -139,7 +125,7 @@ class DualMageRole(BaseRole):
 
             if action is HOME:
                 self.running = False
-            return  # 每轮只触发一个
+            return
 
         # 心跳摘要（每 30 秒）
         if now - self._last_summary >= 30:
@@ -150,62 +136,50 @@ class DualMageRole(BaseRole):
             self._last_summary = now
 
     def _should_trigger(self, action, hp: int, now: float) -> bool:
-        """判断 Action 是否应触发"""
+        """按 Action 优先级依次判断"""
         if action is HEAL_OTHER:
-            # 自保治愈中不救打手
-            if self._f8_pressed:
-                return False
-            with self._hp_lock:
-                current = self._attacker_hp
-            threshold = ATTACKER_HEAL_THRESHOLD
+            current = self._attacker_hp
         else:
             current = hp
-            threshold = action.threshold
 
-        if current >= threshold:
+        if current >= action.threshold:
             return False
 
         if action is DRINK:
-            if now < self._potion_cooldown_end:
+            if now < self._potion_cd_end:
                 return False
         elif action.cooldown > 0:
-            if now < self._heal_cooldown_end:
+            if now < self._heal_cd_end:
                 return False
 
         return True
 
     def _execute(self, action, hp: int, now: float) -> None:
-        """执行一个 Action"""
+        """执行 Action（治愈为阻塞 hold，其余瞬间完成）"""
         if action is HOME:
-            if self._f8_pressed:
-                self.keyboard.release("f8")  # type: ignore[union-attr]
-                self._f8_pressed = False
             self._log.warn(f"血量过低 ({hp})，使用回家卷")
             self.keyboard.hold(action.key, action.hold)  # type: ignore[union-attr]
 
         elif action is DRINK:
             self.keyboard.click(action.key)  # type: ignore[union-attr]
-            self._potion_cooldown_end = now + action.cooldown
+            self._potion_cd_end = now + action.cooldown
             self._potion_count += 1
             self._log.warn(f"喝红水 (HP={hp})")
 
         elif action is SELF_HEAL:
-            self.keyboard.press(action.key)  # type: ignore[union-attr]
-            self._f8_pressed = True
-            self._heal_cooldown_end = now + action.cooldown
+            self.keyboard.hold(action.key, action.hold)  # type: ignore[union-attr]
+            self._heal_cd_end = time.time() + action.cooldown
             self._heal_count += 1
-            self._log.warn(f"自保治愈开始 (HP={hp})")
+            self._log.warn(f"自保治愈 (HP={hp})")
 
         elif action is HEAL_OTHER:
             self.keyboard.hold(action.key, action.hold)  # type: ignore[union-attr]
-            self._heal_cooldown_end = now + action.cooldown
+            self._heal_cd_end = time.time() + action.cooldown
             self._heal_count += 1
             self._log.warn(f"救打手 (打手HP={self._attacker_hp})")
 
     def _cleanup_extra(self) -> None:
         self._udp_running = False
-        if self._f8_pressed:
-            self.keyboard.release("f8")  # type: ignore[union-attr]
         self._unlock_mouse()
         if self._sock:
             self._sock.close()

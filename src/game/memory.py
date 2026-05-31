@@ -15,7 +15,7 @@ log = get_logger()
 ntdll = ctypes.WinDLL('ntdll')
 kernel32 = ctypes.WinDLL('kernel32')
 PROCESS_VM_READ = 0x0010
-MAX_READ_ERRORS = 30  # 连续错误次数上限
+MAX_READ_ERRORS = 100  # 连续错误次数上限（约 20 秒）
 
 
 class GameMemory:
@@ -84,8 +84,11 @@ class GameMemory:
         self._error_count += 1
         return None
 
+    @property
+    def error_count(self) -> int:
+        return self._error_count
+
     def alive(self) -> bool:
-        """进程是否存活（连续错误过多认为已关闭）"""
         return self._error_count < MAX_READ_ERRORS
 
 

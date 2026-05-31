@@ -28,7 +28,10 @@ class AttackerRole(BaseRole):
             return
 
         hp = self.game.get_hp()  # type: ignore[union-attr]
-        if hp is None or hp <= 0:
+        if hp is None:
+            self._log.warn(f"读取血量失败 (连续{self.game.error_count}次)")
+            return
+        if hp <= 0:
             return
 
         data = str(hp).encode('utf-8')

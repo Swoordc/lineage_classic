@@ -21,10 +21,10 @@ SINGLE_MAGE_ACTIONS = [
 ]
 
 # --- 双端法师动作 ---
-HOME   = Action("f12", hold=1.0, cooldown=0,   threshold=50,  priority=0)
-DRINK  = Action("f11", hold=0.1, cooldown=0.5, threshold=100, priority=1)
-SELF_HEAL  = Action("f8", hold=1.2, cooldown=0.5, threshold=130, priority=2)
-HEAL_OTHER = Action("f8", hold=0.7, cooldown=0.5, threshold=235, priority=3)
+HOME   = Action("f12", hold=1.0, cooldown=0,   threshold=70,  priority=0)
+DRINK  = Action("f11", hold=0.1, cooldown=0.5, threshold=120, priority=1)
+SELF_HEAL  = Action("f8", hold=1.5, cooldown=0.7, threshold=160, priority=2)
+HEAL_OTHER = Action("f8", hold=0.5, cooldown=0.7, threshold=250, priority=3)
 
 DUAL_MAGE_ACTIONS = [HOME, DRINK, SELF_HEAL, HEAL_OTHER]
 
@@ -40,16 +40,13 @@ ARDUINO_BAUDRATE = 9600
 
 # ========== 游戏配置 ==========
 GAME_PROCESS = "LC.exe"
-BASE_OFFSET = "149B210"
+BASE_OFFSET = "14A2430"
 WINDOW_CLASS = "GLFW30"
 
 # ========== UDP 通信配置 ==========
 UDP_PORT = 18888               # 发送端和接收端共用
 ATTACKER_IP = "192.168.1.7"    # 法师电脑的 IP（打手发送目标）
 SEND_INTERVAL = 0.2             # 打手发送间隔（秒）
-
-# ========== 攻击者加血阈值 ==========
-ATTACKER_HEAL_THRESHOLD = 235
 
 # ========== 日志 ==========
 LogLevel = Literal["DEBUG", "INFO", "WARN", "ERROR"]
