@@ -1,28 +1,14 @@
-"""双端法师：接收打手血量 + 自保 + 救打手 + 跟随 + Buff"""
+"""双端法师：接收打手血量 + 自保 + 救打手 + Buff"""
 
-import ctypes
-import ctypes.wintypes
 import socket
 import threading
 import time
 
-import pyautogui
-
 from src.config import (
-    BUFF_ENABLED,
-    BUFF_HOLD_DURATION,
-    BUFF_KEY_INTERVAL,
-    BUFF_KEYS,
-    DUAL_MAGE_ACTIONS,
-    HOME,
-    DRINK,
-    SELF_HEAL,
-    HEAL_OTHER,
-    UDP_PORT,
+    BUFF_ENABLED, BUFF_HOLD_DURATION, BUFF_KEY_INTERVAL, BUFF_KEYS,
+    DUAL_MAGE_ACTIONS, HOME, DRINK, SELF_HEAL, HEAL_OTHER, UDP_PORT,
 )
 from src.roles.base import BaseRole
-
-user32 = ctypes.windll.user32
 
 
 class DualMageRole(BaseRole):
@@ -33,27 +19,11 @@ class DualMageRole(BaseRole):
         self._buff_thread: threading.Thread | None = None
         self._udp_running: bool = False
         self._attacker_hp: int = 1000
-        self._click_x: int = 0
-        self._click_y: int = 0
         self._heal_cd_end: float = 0
         self._potion_cd_end: float = 0
         self._last_summary: float = 0
         self._heal_count: int = 0
         self._potion_count: int = 0
-
-    # ========== 鼠标锁定 ==========
-
-    @staticmethod
-    def _lock_mouse(x: int, y: int) -> None:
-        rect = ctypes.wintypes.RECT()
-        rect.left, rect.right = x, x + 1
-        rect.top, rect.bottom = y, y + 1
-        user32.ClipCursor(ctypes.byref(rect))
-        pyautogui.moveTo(x, y)
-
-    @staticmethod
-    def _unlock_mouse() -> None:
-        user32.ClipCursor(None)
 
     # ========== UDP 接收线程 ==========
 
@@ -93,18 +63,11 @@ class DualMageRole(BaseRole):
             self._buff_thread.start()
             self._log.info("Buff 线程已启动")
 
-        self._log.info("双端法师初始化完成")
-        return True
-
-    def _on_start(self) -> None:
-        self._click_x, self._click_y = pyautogui.position()
-        self._lock_mouse(self._click_x, self._click_y)
         self._last_summary = time.time()
         self._heal_count = 0
         self._potion_count = 0
-
-    def _on_stop(self) -> None:
-        self._unlock_mouse()
+        self._log.info("双端法师初始化完成")
+        return True
 
     # ========== 主循环 ==========
 
@@ -116,7 +79,6 @@ class DualMageRole(BaseRole):
 
         self._log.debug(f"HP={hp}, 打手HP={self._attacker_hp}")
 
-        # 按优先级：回家 > 红水 > 自保 > 救打手
         for action in DUAL_MAGE_ACTIONS:
             if not self._should_trigger(action, hp, now):
                 continue
@@ -127,7 +89,6 @@ class DualMageRole(BaseRole):
                 self.running = False
             return
 
-        # 心跳摘要（每 30 秒）
         if now - self._last_summary >= 30:
             self._log.info(
                 f"双法汇总 | HP:{hp} 打手HP:{self._attacker_hp} | "
@@ -136,7 +97,6 @@ class DualMageRole(BaseRole):
             self._last_summary = now
 
     def _should_trigger(self, action, hp: int, now: float) -> bool:
-        """按 Action 优先级依次判断"""
         if action is HEAL_OTHER:
             current = self._attacker_hp
         else:
@@ -155,7 +115,6 @@ class DualMageRole(BaseRole):
         return True
 
     def _execute(self, action, hp: int, now: float) -> None:
-        """执行 Action（治愈为阻塞 hold，其余瞬间完成）"""
         if action is HOME:
             self._log.warn(f"血量过低 ({hp})，使用回家卷")
             self.keyboard.hold(action.key, action.hold)  # type: ignore[union-attr]
@@ -180,7 +139,6 @@ class DualMageRole(BaseRole):
 
     def _cleanup_extra(self) -> None:
         self._udp_running = False
-        self._unlock_mouse()
         if self._sock:
             self._sock.close()
         if self._udp_thread:

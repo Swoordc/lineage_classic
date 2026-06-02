@@ -17,7 +17,7 @@ class Action:
 
 # --- 单端法师动作 ---
 SINGLE_MAGE_ACTIONS = [
-    Action("f8", hold=0.5, cooldown=2.0, threshold=130, priority=0),
+    Action("f8", hold=0.5, cooldown=1.0, threshold=130, priority=0),
 ]
 
 # --- 双端法师动作 ---

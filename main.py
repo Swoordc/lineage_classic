@@ -5,6 +5,7 @@
     python main.py single-mage        单端法师
     python main.py dual-mage          双端法师
     python main.py attacker           打手发送端
+    python main.py party-mage         团队法师（站桩奶妈）
     python main.py attacker -v        打手端（DEBUG 详细日志）
 """
 
@@ -19,7 +20,8 @@ from src.utils.logger import get_logger, set_log_level
 ROLES = {
     "single-mage": ("单端法师", "src.roles.single_mage", "SingleMageRole"),
     "dual-mage":   ("双端法师", "src.roles.dual_mage",   "DualMageRole"),
-    "attacker":    ("打手发送端", "src.roles.attacker",    "AttackerRole"),
+    "attacker":    ("打手发送端", "src.roles.attacker",   "AttackerRole"),
+    "party-mage":  ("团队法师", "src.roles.party_mage",  "StationaryHealerRole"),
 }
 
 
@@ -58,6 +60,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Lineage Classic 辅助工具")
     parser.add_argument(
         "role", nargs="?", choices=list(ROLES.keys()),
+
         help="角色类型（不填则显示菜单）"
     )
     parser.add_argument(

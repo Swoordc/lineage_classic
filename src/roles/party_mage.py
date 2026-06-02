@@ -1,16 +1,14 @@
-"""站桩奶妈：扫描队伍槽位颜色 → 低于阈值治愈 → 自己低血回家
-对标 VBScript 大漠逻辑，用 PIL 截图 + Arduino 键鼠
-
-用法: python main.py stationary-healer
-"""
+"""站桩奶妈：扫描队伍槽位颜色 → 低于阈值治愈 → 低血回家 → 团队加速"""
 
 # ============================================================
-# 配置（改这里就行）
+# 配置
 # ============================================================
 THRESHOLD = 65              # 血量阈值：65 / 70 / 75 / 80
+ENABLE_HOME = True          # 是否启用低血回家
+ENABLE_BUFF = True          # 是否启用 19 分钟团队加速
 SCAN_INTERVAL = 0.1         # 扫描间隔（秒）
 
-# 队伍槽位网格（游戏客户区坐标，跟大漠一致）
+# 队伍槽位网格（游戏客户区坐标）
 FIRST_ROW_X = 12
 FIRST_ROW_Y = 797
 COLUMN_SPACING = 103
@@ -18,10 +16,9 @@ ROW_SPACING = 45
 COLS = 2
 ROWS = 4
 
-# 颜色常量（PIL getpixel 返回 RGB，hex 直接比对）
-CHAR_COLOR = "5a1504"       # 有角色时的 c1 颜色
-GO_HOME_COLOR = "591302"    # [0,0] 名字处正常颜色，不是这个就回家
-# 不同阈值对应的 HP 条目标颜色
+# 颜色常量
+CHAR_COLOR = "5a1504"       # 有角色
+GO_HOME_COLOR = "591302"    # 名字处正常颜色，不是就回家
 HEAL_COLORS = {
     80: "530d02",
     75: "4f0e06",
@@ -31,74 +28,46 @@ HEAL_COLORS = {
 # ============================================================
 
 import time
-import ctypes
-from ctypes import wintypes
 
-import win32gui, win32con
+import win32gui
 import pyautogui
 from PIL import ImageGrab
 
 from src.roles.base import BaseRole
 
-user32 = ctypes.windll.user32
-
 
 class StationaryHealerRole(BaseRole):
-    """站桩奶妈 — 不移动，定时扫描队伍血条"""
-
-    _needs_keyboard = True
+    _needs_memory: bool = False
 
     def __init__(self) -> None:
         super().__init__()
-        self._hwnd: int | None = None
         self._client_left: int = 0
         self._client_top: int = 0
         self._heal_color: str = HEAL_COLORS[THRESHOLD]
         self._heal_count: int = 0
         self._home_used: bool = False
+        self._next_buff_time: float = 0
 
     # ========== 生命周期 ==========
 
     def _setup_extra(self) -> bool:
-        from src.utils.window import find_game_window
-        self._hwnd = find_game_window()
-        if not self._hwnd:
-            self._log.error("未找到游戏窗口")
-            return False
-        return True
+        self._client_left, self._client_top = win32gui.ClientToScreen(self._hwnd, (0, 0))  # type: ignore[arg-type]
 
-    def _on_start(self) -> None:
-        hwnd = self._hwnd
-        if win32gui.IsIconic(hwnd):
-            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-        win32gui.SetForegroundWindow(hwnd)
-        time.sleep(0.3)
-
-        self._client_left, self._client_top = win32gui.ClientToScreen(hwnd, (0, 0))
-
-        # 锁定鼠标范围到游戏窗口
-        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-        rect = wintypes.RECT()
-        rect.left, rect.top = left, top
-        rect.right, rect.bottom = right, bottom
-        user32.ClipCursor(ctypes.byref(rect))
-
-        # 初始选中治愈术
-        self.keyboard.click("f8")
+        self.keyboard.click("f8")  # type: ignore[union-attr]
         time.sleep(0.5)
 
         self._heal_count = 0
         self._home_used = False
-        self._log.info(f"站桩奶妈启动 | 阈值:{THRESHOLD}% | 治愈色:{self._heal_color}")
+        self._log.info(f"站桩奶妈启动 | 阈值:{THRESHOLD}% | 回家:{'开' if ENABLE_HOME else '关'} | 加速:{'开' if ENABLE_BUFF else '关'}")
+        return True
 
-    def _on_stop(self) -> None:
-        user32.ClipCursor(None)
+    def _cleanup_extra(self) -> None:
         self._log.info(f"已停止 | 治愈:{self._heal_count}次 | 回家:{self._home_used}")
 
     # ========== 主循环 ==========
 
     def _tick(self) -> None:
-        # 截客户区
+        now = time.time()
         img = ImageGrab.grab(bbox=(
             self._client_left,
             self._client_top,
@@ -106,30 +75,36 @@ class StationaryHealerRole(BaseRole):
             self._client_top + 960,
         ))
 
+        # 回家检测
+        if ENABLE_HOME:
+            test_color = self._get_hex(img, FIRST_ROW_X + 50, FIRST_ROW_Y)
+            if test_color != GO_HOME_COLOR:
+                self._log.warn(f"触发回家 (颜色:{test_color})")
+                self.keyboard.click("f12")  # type: ignore[union-attr]
+                time.sleep(0.1)
+                self._home_used = True
+                self.running = False
+                img.close()
+                return
+
+        # 团队加速
+        if ENABLE_BUFF and now >= self._next_buff_time:
+            self._buff_round(img)
+            self._next_buff_time = time.time() + 1140
+            img.close()
+            return
+
+        # 治愈扫描
         for row in range(ROWS):
             for col in range(COLS):
                 x = FIRST_ROW_X + col * COLUMN_SPACING
                 y = FIRST_ROW_Y + row * ROW_SPACING
 
-                # --- [0,0]：检查是否回家 ---
-                if col == 0 and row == 0:
-                    test_color = self._get_hex(img, x + 50, y)
-                    if test_color != GO_HOME_COLOR:
-                        self._log.warn("触发回家")
-                        self.keyboard.click("f12")
-                        time.sleep(0.1)
-                        self._home_used = True
-                        self.running = False
-                        img.close()
-                        return
-
-                # --- 检测是否有角色 ---
                 c1 = self._get_hex(img, x, y)
                 if c1 != CHAR_COLOR:
                     img.close()
-                    return  # 空槽位 → 退出，下一轮从 [0,0] 重来
+                    return
 
-                # --- 检查 HP 条颜色 ---
                 cx = x + THRESHOLD
                 c2 = self._get_hex(img, cx, y)
 
@@ -139,6 +114,28 @@ class StationaryHealerRole(BaseRole):
 
         img.close()
 
+    # ========== 团队加速 ==========
+
+    def _buff_round(self, img) -> None:
+        """F9 选技能 → 点队友，从第二个槽位开始"""
+        count = 0
+        for row in range(ROWS):
+            for col in range(COLS):
+                if row == 0 and col == 0:
+                    continue
+                x = FIRST_ROW_X + col * COLUMN_SPACING
+                y = FIRST_ROW_Y + row * ROW_SPACING
+                c1 = self._get_hex(img, x, y)
+                if c1 != CHAR_COLOR:
+                    return
+                self.keyboard.click("f9")  # type: ignore[union-attr]
+                time.sleep(0.05)
+                pyautogui.moveTo(self._client_left + x + 20, self._client_top + y)
+                time.sleep(0.05)
+                self.keyboard.click_mouse()  # type: ignore[union-attr]
+                count += 1
+        self._log.info(f"团队加速完成 | {count}人 | 下一轮 19分钟后")
+
     # ========== 辅助 ==========
 
     @staticmethod
@@ -147,15 +144,9 @@ class StationaryHealerRole(BaseRole):
         return f"{pixel[0]:02x}{pixel[1]:02x}{pixel[2]:02x}"
 
     def _heal(self, client_x: int, client_y: int) -> None:
-        self.keyboard.click("f8")
+        self.keyboard.click("f8")  # type: ignore[union-attr]
         time.sleep(0.05)
         pyautogui.moveTo(self._client_left + client_x, self._client_top + client_y)
         time.sleep(0.05)
-        self.keyboard.click_mouse()
+        self.keyboard.click_mouse()  # type: ignore[union-attr]
         self._heal_count += 1
-
-    def _cleanup_extra(self) -> None:
-        try:
-            user32.ClipCursor(None)
-        except Exception:
-            pass

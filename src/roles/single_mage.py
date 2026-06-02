@@ -4,7 +4,6 @@ import time
 
 from src.config import SINGLE_MAGE_ACTIONS
 from src.roles.base import BaseRole
-from src.utils.window import set_window_size_and_position
 
 
 class SingleMageRole(BaseRole):
@@ -13,13 +12,11 @@ class SingleMageRole(BaseRole):
         self._last_heal_time: float = 0
 
     def _setup_extra(self) -> bool:
-        hwnd = self.game.hwnd  # type: ignore[union-attr]
-        set_window_size_and_position(hwnd, 1280, 960, 0, 0)
         self._log.info("单端法师初始化完成")
         return True
 
     def _tick(self) -> None:
-        action = SINGLE_MAGE_ACTIONS[0]  # 只有一个 Action
+        action = SINGLE_MAGE_ACTIONS[0]
         now = time.time()
 
         if now - self._last_heal_time < action.cooldown:

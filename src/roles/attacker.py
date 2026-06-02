@@ -14,7 +14,6 @@ class AttackerRole(BaseRole):
         super().__init__()
         self._sock: socket.socket | None = None
         self._send_count: int = 0
-        self._last_summary: float = 0
         self._last_send: float = 0
 
     def _setup_extra(self) -> bool:
@@ -29,7 +28,7 @@ class AttackerRole(BaseRole):
 
         hp = self.game.get_hp()  # type: ignore[union-attr]
         if hp is None:
-            self._log.warn(f"读取血量失败 (连续{self.game.error_count}次)")
+            self._log.warn(f"读取血量失败 (连续{self.game.error_count}次)")  # type: ignore[union-attr]
             return
         if hp <= 0:
             return
@@ -39,16 +38,7 @@ class AttackerRole(BaseRole):
         self._send_count += 1
         self._last_send = now
 
-        # 心跳摘要（每 30 秒）
-        now = time.time()
-        if now - self._last_summary >= 30:
-            self._log.info(
-                f"打手汇总 | 发送次数: {self._send_count} | 当前血量: {hp}"
-            )
-            self._last_summary = now
-
-        self._log.debug(f"发送血量: {hp}")
-
     def _cleanup_extra(self) -> None:
+        self._log.info(f"累计发送: {self._send_count}次")
         if self._sock:
             self._sock.close()
