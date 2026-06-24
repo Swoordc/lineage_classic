@@ -12,6 +12,8 @@ from src.roles.base import BaseRole
 
 
 class DualMageRole(BaseRole):
+    _needs_window_move: bool = True
+
     def __init__(self) -> None:
         super().__init__()
         self._sock: socket.socket | None = None

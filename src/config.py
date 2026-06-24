@@ -35,12 +35,12 @@ BUFF_HOLD_DURATION = 0.6
 BUFF_KEY_INTERVAL = 2.0
 
 # ========== Arduino 配置 ==========
-ARDUINO_PORT = "COM3"
+ARDUINO_PORT = "COM6"
 ARDUINO_BAUDRATE = 9600
 
 # ========== 游戏配置 ==========
 GAME_PROCESS = "LC.exe"
-BASE_OFFSET = "14A2430"
+BASE_OFFSET = "14CC880"
 WINDOW_CLASS = "GLFW30"
 
 # ========== UDP 通信配置 ==========

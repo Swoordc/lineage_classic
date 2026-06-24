@@ -20,6 +20,7 @@ class BaseRole(ABC):
 
     _needs_keyboard: bool = True
     _needs_memory: bool = True
+    _needs_window_move: bool = False  # 法师角色需要窗口前置到 (0,0)
 
     def __init__(self) -> None:
         self.game = None
@@ -55,7 +56,9 @@ class BaseRole(ABC):
         self._hwnd = hwnd
         self._log.info(f"窗口句柄: {hwnd}")
 
-        # 激活游戏窗口
+        if self._needs_window_move:
+            win32gui.SetWindowPos(hwnd, win32con.HWND_TOP, 0, 0, 0, 0,
+                                  win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW)
         if win32gui.IsIconic(hwnd):
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
         win32gui.SetForegroundWindow(hwnd)

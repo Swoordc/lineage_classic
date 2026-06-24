@@ -1,0 +1,283 @@
+' ========== 大漠初始化 ==========
+Dim dm, hwnd
+Dim ARDUINO_COM_PORT
+Dim attack_spec, center_x, center_y, start_radius, end_radius, step, ArcLength
+Dim Arrow_Addr, X_Addr
+Dim PIC
+Dim startPos(1)
+
+'银箭或箭的内存地址
+Arrow_Addr = "1F3B204B648"
+' 角色X,Y坐标内存地址,Y是X+4
+X_Addr = "14B54F0"
+Y_Addr = "14B54F4"
+' Arduino鼠标控制函数库
+ARDUINO_COM_PORT = "COM3"  ' 修改这里！！！
+' 寻路参数
+Const OFFSET = 60        ' 点击偏移量
+Const THRESHOLD = 3      ' 阈值范围
+' 寻找怪物
+attack_spec = "224d7557"	'攻击时鼠标特征码
+center_x = 634
+center_y = 394
+' 环形扫描
+start_radius = 25
+end_radius = 380
+step = 25
+' ★ 关键参数：两点之间的弧长（像素）
+ArcLength = 25  ' 每20像素放一个检测点，扫描速度越大越快
+
+
+Sub InitDm()
+    Set dm = CreateObject("dm.dmsoft")
+    If dm Is Nothing Then
+        MessageBox "大漠插件注册失败"
+        EndScript
+    End If
+    
+    hwnd = dm.FindWindow("GLFW30", "")
+    If hwnd = 0 Then
+        MessageBox "未找到游戏窗口"
+        EndScript
+    End If
+    
+    If dm.BindWindow(hwnd, "normal", "normal", "normal", 0) = 0 Then
+        MessageBox "窗口绑定失败"
+        EndScript
+    End If
+	
+	dm.SetWindowState hwnd, 1
+	dm.Delay 500
+	dm.MoveWindow hwnd,0,0
+	dm.Delay 500
+	'截图
+	PIC = dm.GetDir(0) & "\battle_check.bmp"
+End Sub
+
+' 鼠标左键按下
+Sub Arduino_Down()
+    Dim psCmd
+    psCmd = "powershell -Command ""$port = new-Object System.IO.Ports.SerialPort " & ARDUINO_COM_PORT & ",9600; $port.Open(); $port.Write('d'); $port.Close()"""
+    Call RunPowerShell(psCmd)
+End Sub
+
+' 鼠标左键释放
+Sub Arduino_Up()
+    Dim psCmd
+    psCmd = "powershell -Command ""$port = new-Object System.IO.Ports.SerialPort " & ARDUINO_COM_PORT & ",9600; $port.Open(); $port.Write('u'); $port.Close()"""
+    Call RunPowerShell(psCmd)
+End Sub
+
+' 鼠标点击函数
+Sub Arduino_Click()
+    Call Arduino_Down()
+    dm.Delay 50
+    Call Arduino_Up()
+End Sub
+
+' 鼠标移动并点击
+Sub ClickAt(x, y)
+    dm.MoveTo x, y
+    dm.Delay 100
+    Call Arduino_Click()
+End Sub
+
+' 发送任意按键到Arduino（按下+释放）
+Sub Arduino_KeyPress(keyCode)
+    Dim psCmd
+    psCmd = "powershell -Command ""$port = new-Object System.IO.Ports.SerialPort " & ARDUINO_COM_PORT & ",9600; $port.Open(); $port.Write('c'); $port.Write([byte]" & keyCode & "); $port.Close()"""
+    Call RunPowerShell(psCmd)
+End Sub
+
+' 运行PowerShell命令
+Sub RunPowerShell(cmd)
+    Dim shell
+    Set shell = CreateObject("WScript.Shell")
+    shell.Run cmd, 0, True
+    Set shell = Nothing
+End Sub
+
+' 持久攻击
+sub Attack_Auto()
+	Call Arduino_Down()
+	dm.MoveTo 591,859
+	Call Arduino_Up()
+	dm.Delay 200
+	Call Arduino_KeyPress(27)
+End Sub
+
+'扫描怪物
+Function Find_Monsters()
+	' 开始扫描
+	For radius = start_radius To end_radius Step step
+		' ★ 根据半径计算角度步长（保持弧长一致）
+		If radius > 0 Then
+			' 计算每个点之间的角度（弧度）
+			angle_step_rad = ArcLength / radius
+			' 转成度数
+			angle_step = angle_step_rad * 180 / 3.141592653589793
+			
+			' 最少要4个点（防止角度太大）
+			If angle_step > 90 Then angle_step = 90
+			' 最多不要超过45度
+			If angle_step < 5 Then angle_step = 5
+		Else
+			angle_step = 90  ' 防止除零
+		End If
+		
+		For angle = 0 To 360 - angle_step Step angle_step
+			' 计算坐标
+			rad = angle * 3.141592653589793 / 180
+			target_x = center_x + radius * Cos(rad)
+			target_y = center_y + radius * Sin(rad)
+			
+			' 移动鼠标
+			dm.MoveTo Int(target_x), Int(target_y)
+			dm.Delay 5
+			
+			' 检测光标形状
+			current_spec = dm.GetCursorShape()
+			
+			If current_spec = attack_spec Then
+				Find_Monsters = True
+				Exit Function
+			End If
+		Next
+	Next
+	dm.Delay 200
+End Function
+
+' 判断战斗是否结束（通过多点颜色对比）
+' 参数：waitTime - 等待时间（毫秒）
+' 返回值：True-战斗结束，False-战斗还在继续（超时也返回False）
+Function IsBattleEnded_ByPixel(waitTime)
+    Dim colors1(3), colors2(3), i, hasChange
+    Dim startTime, currentTime
+    
+    ' 定义3个采样点的坐标
+    Dim points(3, 1)
+    points(0, 0) = 1188 : points(0, 1) = 819   ' 点1
+    points(1, 0) = 1190 : points(1, 1) = 823   ' 点2
+    points(2, 0) = 1187 : points(2, 1) = 824   ' 点3
+    
+    ' 记录开始时间
+    startTime = dm.GetTime()
+    
+    Do
+        ' 检查是否超过40秒
+        currentTime = dm.GetTime()
+        If currentTime - startTime >= 40000 Then
+            TracePrint "超过40秒，强制退出"
+            IsBattleEnded_ByPixel = False
+            Exit Function
+        End If
+        
+        ' 第一次：记录所有点的颜色
+        For i = 0 To 2
+            colors1(i) = dm.GetColor(points(i, 0), points(i, 1))
+        Next
+        
+        ' 等待
+        dm.Delay waitTime
+        
+        ' 第二次：对比每个点
+        hasChange = False
+        For i = 0 To 2
+            colors2(i) = dm.GetColor(points(i, 0), points(i, 1))
+            If colors2(i) <> colors1(i) Then
+                hasChange = True
+                Exit For
+            End If
+        Next
+        
+        ' 没有变化 → 战斗结束
+        If hasChange = False Then
+            IsBattleEnded_ByPixel = True
+            Exit Function
+        End If
+    Loop
+End Function
+
+'站立不动自动练功
+Sub Auto_Play()
+	dim result
+	If Find_Monsters() = True Then
+		Call Attack_Auto()
+		Call IsBattleEnded_ByPixel(1000)
+	End If
+End Sub
+
+' 获取人物角色坐标
+Function GetPlayerPos()
+    Dim pos(1)
+    
+    ' 读取X坐标
+    pos(0) = CLng(CStr(dm.ReadInt(hwnd, "<LC.exe>+" & X_Addr, 0)))
+    
+    ' 读取Y坐标
+    pos(1) = CLng(CStr(dm.ReadInt(hwnd, "<LC.exe>+" & Y_Addr, 0)))
+    
+    GetPlayerPos = pos
+End Function
+
+Function MoveToStart()
+    Dim maxAttempts: maxAttempts = 100  ' 最大尝试次数，避免死循环
+    Dim attempt: attempt = 0
+	Dim currentPos(1)
+    
+    Do While attempt < maxAttempts
+        attempt = attempt + 1
+        
+		currentPos(0) = GetPlayerPos()(0)
+		currentPos(1) = GetPlayerPos()(1)
+        Dim diffX: diffX = currentPos(0) - startPos(0)
+        Dim diffY: diffY = currentPos(1) - startPos(1)
+		
+        
+        ' 检查是否到达
+        If Abs(diffX) <= THRESHOLD And Abs(diffY) <= THRESHOLD Then
+            SimpleMoveToStart = True
+            Exit Function
+		Else
+			TracePrint "原始坐标: " & startPos(0) &","& startPos(0) & "当前坐标: " & currentPos(0) &","& currentPos(1)
+        End If
+        
+        ' 计算点击方向
+        Dim clickX, clickY
+        clickX = center_x
+        clickY = center_y
+        
+        ' X方向
+        If diffX < -THRESHOLD Then
+            clickX = center_x + OFFSET  ' 向右走
+        ElseIf diffX > THRESHOLD Then
+            clickX = center_x - OFFSET  ' 向左走
+        End If
+        
+        ' Y方向
+        If diffY < -THRESHOLD Then
+            clickY = center_y + OFFSET  ' 向下走
+        ElseIf diffY > THRESHOLD Then
+            clickY = center_y - OFFSET  ' 向上走
+        End If
+        
+        ' 执行移动
+        Call ClickAt(clickX, clickY)
+        dm.Delay 1000
+    Loop
+    
+    TracePrint "移动失败，已达到最大尝试次数"
+    SimpleMoveToStart = False
+End Function
+
+' ========== 测试 ==========
+Call InitDm()
+'角色初始位置
+startPos(0) = GetPlayerPos()(0)
+startPos(1) = GetPlayerPos()(1)
+
+Do
+	Call Auto_Play()
+	Call MoveToStart()
+	dm.Delay 100
+Loop

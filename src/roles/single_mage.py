@@ -7,6 +7,8 @@ from src.roles.base import BaseRole
 
 
 class SingleMageRole(BaseRole):
+    _needs_window_move: bool = True
+
     def __init__(self) -> None:
         super().__init__()
         self._last_heal_time: float = 0
