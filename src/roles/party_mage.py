@@ -8,7 +8,7 @@ HOME_THRESHOLD = 0                      # 回家阈值百分比（0=禁用，如
 SKILL_CD = 1.0                          # 技能全局冷却（秒）
 
 # BUFF: 空列表 = 禁用，否则按顺序给每个队友逐个释放
-BUFF_KEYS = ["f9"]
+BUFF_KEYS = ["f9","f10"]
 BUFF_CYCLE = 1140                       # BUFF 周期（秒），默认 19 分钟
 
 # 队伍槽位网格（游戏客户区坐标）
@@ -30,7 +30,7 @@ import pyautogui
 from PIL import ImageGrab
 
 from src.roles.base import BaseRole
-from src.utils.hp_bar import hp_above, is_away, _hex
+from src.utils.hp_bar import hp_above, is_away, count_grayish, _hex, AWAY_MIN
 
 
 class StationaryHealerRole(BaseRole):
@@ -43,10 +43,14 @@ class StationaryHealerRole(BaseRole):
         self._client_top: int = 0
         self._skill_cd_end: float = 0
 
+        # 治愈状态机
+        self._heal_col: int = 1        # 扫描起点列（跳过 [0,0]）
+        self._heal_row: int = 0
+
         # BUFF 状态机
-        self._buff_col: int = 1       # 当前队友列（跳过 [0,0] 自己）
+        self._buff_col: int = 1        # 当前队友列
         self._buff_row: int = 0
-        self._buff_skill: int = 0     # BUFF_KEYS 索引
+        self._buff_skill: int = 0      # BUFF_KEYS 索引
         self._buff_active: bool = False
         self._next_buff_time: float = 0
 
@@ -62,7 +66,37 @@ class StationaryHealerRole(BaseRole):
             f"站桩奶妈启动 | 治愈阈值:{THRESHOLD}% | 回家阈值:{HOME_THRESHOLD}%"
             f" | BUFF:{BUFF_KEYS if BUFF_KEYS else '关'} | 周期:{BUFF_CYCLE // 60}分钟"
         )
+
+        # 扫描并打印队伍信息
+        img = ImageGrab.grab(bbox=(
+            self._client_left, self._client_top,
+            self._client_left + 1280, self._client_top + 960,
+        ))
+        self._print_party_summary(img)
+        img.close()
         return True
+
+    def _print_party_summary(self, img) -> None:
+        """启动时打印队伍各槽位信息"""
+        count = 0
+        for row in range(ROWS):
+            for col in range(COLS):
+                x = FIRST_ROW_X + col * COLUMN_SPACING
+                y = FIRST_ROW_Y + row * ROW_SPACING
+
+                c1 = _hex(img, x, y)
+                has_char = c1 == CHAR_COLOR
+                if has_char:
+                    count += 1
+                    gray, total = count_grayish(img, x, y)
+                    away = f"远离 (灰色{gray}/{total})" if gray >= AWAY_MIN else "在身旁"
+                    hp_ok = hp_above(img, x, y, THRESHOLD)
+                    hp_str = f"HP{'≥' if hp_ok else '<'}{THRESHOLD}%"
+                    self._log.info(f"  [{col},{row}] c1={c1} {away} {hp_str}")
+                else:
+                    self._log.info(f"  [{col},{row}] c1={c1} ≠ {CHAR_COLOR} 无角色")
+
+        self._log.info(f"共 {count} 个角色")
 
     def _cleanup_extra(self) -> None:
         pass
@@ -98,7 +132,7 @@ class StationaryHealerRole(BaseRole):
             return
 
         # ---- 治愈扫描（生命优先） ----
-        done = self._heal_scan(img)
+        done = self._heal_tick(img)
         if done:
             img.close()
             return
@@ -118,31 +152,41 @@ class StationaryHealerRole(BaseRole):
         self._buff_step(img)
         img.close()
 
-    # ========== 治愈扫描 ==========
+    # ========== 治愈状态机 ==========
 
-    def _heal_scan(self, img) -> bool:
-        """遍历槽位治愈。空槽停扫，远离跳过，低血治愈一个后停止。
-        返回 True 表示已执行了操作。"""
-        stop = False
-        for row in range(ROWS):
-            if stop:
-                break
-            for col in range(COLS):
-                x = FIRST_ROW_X + col * COLUMN_SPACING
-                y = FIRST_ROW_Y + row * ROW_SPACING
+    def _heal_tick(self, img) -> bool:
+        """从 (_heal_col, _heal_row) 开始找第一个需要治愈的。
+        空槽归零，远离跳过，低血治愈后推进指针。
+        返回 True 表示执行了治愈。"""
+        col, row = self._heal_col, self._heal_row
+        scanned = 0
+        while scanned < 8:
+            x = FIRST_ROW_X + col * COLUMN_SPACING
+            y = FIRST_ROW_Y + row * ROW_SPACING
 
-                if _hex(img, x, y) != CHAR_COLOR:
-                    stop = True
-                    break
+            if _hex(img, x, y) != CHAR_COLOR:
+                self._heal_col, self._heal_row = 1, 0
+                return False
 
-                if is_away(img, x, y):
-                    continue
+            if not is_away(img, x, y) and not hp_above(img, x, y, THRESHOLD):
+                self._heal(x + THRESHOLD, y)
+                self._advance_heal_pointer(col, row)
+                return True
 
-                if not hp_above(img, x, y, THRESHOLD):
-                    self._heal(x + THRESHOLD, y)
-                    return True
+            self._advance_heal_pointer(col, row)
+            col, row = self._heal_col, self._heal_row
+            scanned += 1
 
         return False
+
+    def _advance_heal_pointer(self, col: int, row: int) -> None:
+        col += 1
+        if col >= COLS:
+            col = 0
+            row += 1
+        if row >= ROWS:
+            col, row = 1, 0
+        self._heal_col, self._heal_row = col, row
 
     # ========== BUFF 状态机 ==========
 
