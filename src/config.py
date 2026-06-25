@@ -24,7 +24,7 @@ SINGLE_MAGE_ACTIONS = [
 HOME   = Action("f12", hold=1.0, cooldown=0,   threshold=70,  priority=0)
 DRINK  = Action("f11", hold=0.1, cooldown=0.5, threshold=120, priority=1)
 SELF_HEAL  = Action("f8", hold=1.5, cooldown=0.7, threshold=160, priority=2)
-HEAL_OTHER = Action("f8", hold=0.5, cooldown=0.7, threshold=250, priority=3)
+HEAL_OTHER = Action("f8", hold=0.5, cooldown=0.7, threshold=350, priority=3)
 
 DUAL_MAGE_ACTIONS = [HOME, DRINK, SELF_HEAL, HEAL_OTHER]
 

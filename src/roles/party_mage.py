@@ -4,11 +4,12 @@
 # 配置
 # ============================================================
 THRESHOLD = 70                          # 治愈触发阈值百分比
-HOME_THRESHOLD = 0                      # 回家阈值百分比（0=禁用，如 30 则 HP<30% 回家）
+HOME_THRESHOLD = 0                      # 回家阈值百分比（0=禁用）
+DRINK_THRESHOLD = 0                     # 喝红阈值百分比（0=禁用）
 SKILL_CD = 1.0                          # 技能全局冷却（秒）
 
 # BUFF: 空列表 = 禁用，否则按顺序给每个队友逐个释放
-BUFF_KEYS = ["f9","f10"]
+BUFF_KEYS = ["f9"]
 BUFF_CYCLE = 1140                       # BUFF 周期（秒），默认 19 分钟
 
 # 队伍槽位网格（游戏客户区坐标）
@@ -44,7 +45,7 @@ class StationaryHealerRole(BaseRole):
         self._skill_cd_end: float = 0
 
         # 治愈状态机
-        self._heal_col: int = 1        # 扫描起点列（跳过 [0,0]）
+        self._heal_col: int = 0        # 扫描起点（含自己 [0,0]）
         self._heal_row: int = 0
 
         # BUFF 状态机
@@ -123,8 +124,9 @@ class StationaryHealerRole(BaseRole):
                 return
 
         # ---- 喝红检测 ----
-        if _hex(img, FIRST_ROW_X + 73, FIRST_ROW_Y) == "242222":
-            self.keyboard.click("f11")  # type: ignore[union-attr]
+        if DRINK_THRESHOLD > 0:
+            if not hp_above(img, FIRST_ROW_X, FIRST_ROW_Y, DRINK_THRESHOLD):
+                self.keyboard.click("f11")  # type: ignore[union-attr]
 
         # ---- CD 中只检测回家/喝红 ----
         if now < self._skill_cd_end:
@@ -165,7 +167,7 @@ class StationaryHealerRole(BaseRole):
             y = FIRST_ROW_Y + row * ROW_SPACING
 
             if _hex(img, x, y) != CHAR_COLOR:
-                self._heal_col, self._heal_row = 1, 0
+                self._heal_col, self._heal_row = 0, 0
                 return False
 
             if not is_away(img, x, y) and not hp_above(img, x, y, THRESHOLD):
@@ -185,7 +187,7 @@ class StationaryHealerRole(BaseRole):
             col = 0
             row += 1
         if row >= ROWS:
-            col, row = 1, 0
+            col, row = 0, 0
         self._heal_col, self._heal_row = col, row
 
     # ========== BUFF 状态机 ==========
